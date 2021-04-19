@@ -12,7 +12,6 @@ import javax.persistence.*;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
     @Column
@@ -26,7 +25,6 @@ public class User {
 
     @Column
     private boolean flag;
-
 
     public User (long id) {
         this.id = id;

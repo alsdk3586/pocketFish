@@ -1,106 +1,93 @@
 import React, { useState, useEffect } from "react";
 import { StyleSheet, TouchableOpacity, ScrollView } from "react-native";
-import { rankingApi } from "../utils/axios";
+import { kakaoApi, rankingApi } from "../utils/axios";
 
 import { Text, View } from "../components/Themed";
 
-import SegmentedControlTab from "react-native-segmented-control-tab";
-
 import RankerView from "../components/ranking/RankerView";
+import FishListView from "../components/ranking/FishListView";
+import { getData } from "../utils/storage";
+import { useDispatch } from "react-redux";
+import { SetUser } from "../redux/user";
 
-export default function Home() {
+export default function RankingScreen({ navigation }) {
   const [rankers, setRankers] = useState([]);
   const [cache, setCache] = useState({});
-  const [tab1Index, setTab1Index] = useState(0);
-  const [tab2Index, setTab2Index] = useState(0);
-  useEffect(() => {
-    updateRanker(tab1Index, tab2Index);
-  }, [tab1Index, tab2Index]);
+  const [selected, setSelected] = useState(1);
 
-  function selectedFish() {
-    let fish = "";
-    let fish_id = 0;
-    switch (tab1Index) {
-      case 0:
-        switch (tab2Index) {
-          case 0:
-            fish = "flatfish";
-            fish_id = 1;
-            break;
-          case 1:
-            fish = "rockfish";
-            fish_id = 3;
-            break;
-          case 2:
-            fish = "red_snapper";
-            fish_id = 2;
-            break;
-        }
-        break;
-      case 1:
-        switch (tab2Index) {
-          case 0:
-            fish = "crucian_carp";
-            fish_id = 4;
-            break;
-          case 1:
-            fish = "bass";
-            fish_id = 6;
-            break;
-          case 2:
-            fish = "golden_mandarin_fish";
-            fish_id = 5;
-            break;
-        }
-        break;
-    }
-    return [fish, fish_id];
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    login();
+  }, []);
+
+  useEffect(() => {
+    updateRanker(selected);
+  }, [selected]);
+
+  function login() {
+    getData("auth").then((data) => {
+      if (data) {
+        kakaoApi
+          .kakaoUserInfo()
+          .then((response) => {
+            const {
+              id,
+              properties: { nickname, profile_image },
+            } = response;
+            getData("auth").then((data) => {
+              const jsonData = JSON.parse(data);
+              const { access_token } = jsonData;
+              dispatch(
+                SetUser(
+                  JSON.stringify({
+                    id,
+                    nickname,
+                    profile_image,
+                    access_token,
+                  })
+                )
+              );
+            });
+          })
+          .catch((e) => {
+            console.log(e);
+          });
+      } else {
+        console.log("no data");
+      }
+    });
   }
-  function updateRanker(tab1, tab2) {
-    const [fish, fish_id] = selectedFish();
-    console.log(fish, fish_id);
-    if (cache[fish_id] === undefined) {
-      console.log("uncached data!");
-      rankingApi.getRanking(fish_id).then((response: []) => {
-        const updatedCache = cache;
-        updatedCache[fish_id] = response.data;
-        setCache(updatedCache);
-        setRankers(response.data);
-      });
-    } else {
-      console.log("cached data!");
-      setRankers(cache[fish_id]);
-    }
+  function updateRanker(selected: number) {
+    // no cache mode
+    rankingApi.getRanking(selected).then((response: []) => {
+      const updatedCache = cache;
+      updatedCache[selected] = response.data;
+      setCache(updatedCache);
+      setRankers(response.data);
+    });
+    // cache mode
+    // if (cache[selected] === undefined) {
+    //   rankingApi.getRanking(selected).then((response: []) => {
+    //     const updatedCache = cache;
+    //     updatedCache[selected] = response.data;
+    //     setCache(updatedCache);
+    //     setRankers(response.data);
+    //   });
+    // } else {
+    //   console.log("cached data!");
+    //   setRankers(cache[selected]);
+    // }
   }
   return (
     <View style={styles.container}>
-      <View style={styles.headerView}>
-        <SegmentedControlTab
-          values={["바다", "민물"]}
-          selectedIndex={tab1Index}
-          onTabPress={(index) => {
-            setTab1Index(index);
-            setTab2Index(0);
-          }}
-          tabsContainerStyle={{
-            width: "90%",
-          }}
-        />
-        <SegmentedControlTab
-          values={
-            tab1Index === 0
-              ? ["광어", "우럭", "참돔"]
-              : ["붕어", "배스", "쏘가리"]
-          }
-          selectedIndex={tab2Index}
-          onTabPress={(index) => setTab2Index(index)}
-          tabsContainerStyle={{
-            width: "90%",
-          }}
-        />
-      </View>
+      <FishListView setSelected={setSelected} />
       <View style={styles.contentView}>
-        {rankers ? <RankerView rankers={rankers} /> : <></>}
+        {rankers ? (
+          <RankerView rankers={rankers} navigation={navigation} />
+        ) : (
+          <></>
+        )}
       </View>
     </View>
   );
@@ -149,7 +136,6 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 15,
     backgroundColor: "#0560CF",
-    width: "90%",
     padding: 10,
     borderRadius: 10,
   },
